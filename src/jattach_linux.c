@@ -204,6 +204,8 @@ static int enter_mount_ns(int pid) {
 }
 
 int main(int argc, char** argv) {
+    int k, fd;
+    
     if (argc < 3) {
         printf("Usage: jattach <pid> <cmd> <args> ...\n");
         return 1;
@@ -227,25 +229,28 @@ int main(int argc, char** argv) {
         perror("Could not start attach mechanism");
         return 1;
     }
+    
+    for (k = 0; k < 500; k++) {
+        fd = connect_socket(nspid);
+        if (fd == -1) {
+            perror("Could not connect to socket");
+            return 1;
+        }
 
-    int fd = connect_socket(nspid);
-    if (fd == -1) {
-        perror("Could not connect to socket");
-        return 1;
+        printf("Connected to remote JVM\n");
+        if (!write_command(fd, argc - 2, argv + 2)) {
+            perror("Error writing to socket");
+            close(fd);
+            return 1;
+        }
+
+        printf("Response code = ");
+        read_response(fd);
+
+        printf("\n");
+        close(fd);
+        usleep(10000);
     }
     
-    printf("Connected to remote JVM\n");
-    if (!write_command(fd, argc - 2, argv + 2)) {
-        perror("Error writing to socket");
-        close(fd);
-        return 1;
-    }
-
-    printf("Response code = ");
-    read_response(fd);
-
-    printf("\n");
-    close(fd);
-
     return 0;
 }
